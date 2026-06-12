@@ -56,6 +56,19 @@ describe("validateBranchName", () => {
       expect(() => validateBranchName("feature+new-thing")).not.toThrow();
     });
 
+    it("should accept branch names containing @ (git-valid, used by @-prefixed conventions)", () => {
+      // Reported in #998: branches like "@hotfix/APLSP-278" were rejected, even though
+      // git check-ref-format and GitHub accept @ anywhere except the bare name "@"
+      // and the "@{" sequence.
+      expect(() => validateBranchName("@hotfix/APLSP-278")).not.toThrow();
+      expect(() =>
+        validateBranchName("@hotfix/APLSP-278-kpi-comparison"),
+      ).not.toThrow();
+      expect(() => validateBranchName("release@2024-06")).not.toThrow();
+      expect(() => validateBranchName("user@feature/branch")).not.toThrow();
+      expect(() => validateBranchName("trailing@")).not.toThrow();
+    });
+
     it("should accept branch names containing , (git-valid, common in title-derived branches)", () => {
       // Reported in #1300: branches like "feature/a,b" were rejected, even though
       // git check-ref-format and GitHub both accept commas. Common when branch names
@@ -224,6 +237,12 @@ describe("validateBranchName", () => {
       expect(() => validateBranchName(".")).toThrow();
       expect(() => validateBranchName("/")).toThrow();
       expect(() => validateBranchName("-")).toThrow();
+    });
+
+    it("should reject bare @ (HEAD shorthand, not a valid ref name)", () => {
+      expect(() => validateBranchName("@")).toThrow(
+        /"@" alone is not a valid branch name/,
+      );
     });
   });
 });

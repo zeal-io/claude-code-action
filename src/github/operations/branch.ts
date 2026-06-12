@@ -27,8 +27,9 @@ function extractFirstLabel(githubData: FetchDataResult): string | undefined {
  * This prevents command injection by ensuring only safe characters are used.
  *
  * Valid branch names:
- * - Start with alphanumeric character (not dash, to prevent option injection)
- * - Contain only alphanumeric, forward slash, hyphen, underscore, period, or hash (#)
+ * - Start with alphanumeric character or @ (not dash, to prevent option injection)
+ * - Contain only alphanumeric, forward slash, hyphen, underscore, period, hash (#), or at sign (@)
+ * - Are not the single character '@' (reserved as HEAD shorthand in git revision syntax)
  * - Do not start or end with a period
  * - Do not end with a slash
  * - Do not contain '..' (path traversal)
@@ -64,12 +65,23 @@ export function validateBranchName(branchName: string): void {
   //   converting worktree names containing "/" (e.g. "feat/foo" becomes "worktree-feat+foo").
   // , is valid per git-check-ref-format and commonly appears in branch names derived from titles
   //   or external identifiers (e.g. place names like "feature/paris,france").
+  // @ is valid per git-check-ref-format anywhere in a ref name except the bare name "@" and the
+  //   sequence "@{" (both rejected below); @-prefixed conventions like "@hotfix/..." are used in
+  //   the wild and are accepted by git and GitHub.
   // All git calls use execFileSync (not shell interpolation), so none of these characters carry injection risk.
-  const validPattern = /^[a-zA-Z0-9][a-zA-Z0-9/_.#+,-]*$/;
+  const validPattern = /^[a-zA-Z0-9@][a-zA-Z0-9/_.#+,@-]*$/;
 
   if (!validPattern.test(branchName)) {
     throw new Error(
-      `Invalid branch name: "${branchName}". Branch names must start with an alphanumeric character and contain only alphanumeric characters, forward slashes, hyphens, underscores, periods, hashes (#), plus signs (+), or commas (,).`,
+      `Invalid branch name: "${branchName}". Branch names must start with an alphanumeric character or '@' and contain only alphanumeric characters, forward slashes, hyphens, underscores, periods, hashes (#), plus signs (+), commas (,), or at signs (@).`,
+    );
+  }
+
+  // "@" alone is not a valid ref name per git-check-ref-format, and is HEAD shorthand
+  // in git revision syntax, so it must never reach git as a branch argument.
+  if (branchName === "@") {
+    throw new Error(
+      `Invalid branch name: "@". "@" alone is not a valid branch name.`,
     );
   }
 
